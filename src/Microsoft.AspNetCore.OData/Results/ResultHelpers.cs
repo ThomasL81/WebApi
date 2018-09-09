@@ -13,29 +13,23 @@ using Microsoft.OData;
 using Microsoft.OData.Edm;
 using ODataPath = Microsoft.AspNet.OData.Routing.ODataPath;
 
-namespace Microsoft.AspNet.OData.Results
-{
-    internal static partial class ResultHelpers
-    {
+namespace Microsoft.AspNet.OData.Results {
+    internal static partial class ResultHelpers {
         /// <remarks>This signature uses types that are AspNetCore-specific.</remarks>
-        public static Uri GenerateODataLink(HttpRequest request, object entity, bool isEntityId)
-        {
+        public static Uri GenerateODataLink( HttpRequest request, IEdmEntityObject entity, bool isEntityId ) {
             IEdmModel model = request.GetModel();
-            if (model == null)
-            {
-                throw new InvalidOperationException(SRResources.RequestMustHaveModel);
+            if ( model == null ) {
+                throw new InvalidOperationException( SRResources.RequestMustHaveModel );
             }
 
             ODataPath path = request.ODataFeature().Path;
-            if (path == null)
-            {
-                throw new InvalidOperationException(SRResources.ODataPathMissing);
+            if ( path == null ) {
+                throw new InvalidOperationException( SRResources.ODataPathMissing );
             }
 
             IEdmNavigationSource navigationSource = path.NavigationSource;
-            if (navigationSource == null)
-            {
-                throw new InvalidOperationException(SRResources.NavigationSourceMissingDuringSerialization);
+            if ( navigationSource == null ) {
+                throw new InvalidOperationException( SRResources.NavigationSourceMissingDuringSerialization );
             }
 
             ODataSerializerContext serializerContext = new ODataSerializerContext
@@ -47,32 +41,63 @@ namespace Microsoft.AspNet.OData.Results
                 Path = path
             };
 
-            IEdmEntityTypeReference entityType = GetEntityType(model, entity);
-            ResourceContext resourceContext = new ResourceContext(serializerContext, entityType, entity);
-
-            return GenerateODataLink(resourceContext, isEntityId);
+            IEdmEntityTypeReference entityType = entity.GetEdmType() as IEdmEntityTypeReference;  //GetEntityType(model, entity);
+            ResourceContext resourceContext = new ResourceContext(serializerContext, entityType, entity as IEdmStructuredObject);
+            return GenerateODataLink( resourceContext, isEntityId );
         }
 
         /// <remarks>This signature uses types that are AspNetCore-specific.</remarks>
-        public static void AddEntityId(HttpResponse response, Func<Uri> entityId)
-        {
-            if (response.StatusCode == (int)HttpStatusCode.NoContent)
+        public static Uri GenerateODataLink( HttpRequest request, object entity, bool isEntityId ) {
+            IEdmModel model = request.GetModel();
+            if ( model == null ) {
+                throw new InvalidOperationException( SRResources.RequestMustHaveModel );
+            }
+
+            ODataPath path = request.ODataFeature().Path;
+            if ( path == null ) {
+                throw new InvalidOperationException( SRResources.ODataPathMissing );
+            }
+
+            IEdmNavigationSource navigationSource = path.NavigationSource;
+            if ( navigationSource == null ) {
+                throw new InvalidOperationException( SRResources.NavigationSourceMissingDuringSerialization );
+            }
+
+            ODataSerializerContext serializerContext = new ODataSerializerContext
             {
-                response.Headers.Add(EntityIdHeaderName, entityId().ToString());
+                NavigationSource = navigationSource,
+                Model = model,
+                MetadataLevel = ODataMetadataLevel.FullMetadata, // Used internally to always calculate the links.
+                Request = request,
+                Path = path
+            };
+            IEdmEntityObject untypedEntity = entity as IEdmEntityObject;
+            IEdmEntityTypeReference entityType = null;
+            if ( untypedEntity == null ) {
+                entityType = GetEntityType( model, entity );
+            } else {
+                entityType = untypedEntity.GetEdmType().AsEntity();
+            }
+            ResourceContext resourceContext = new ResourceContext(serializerContext, entityType, entity);
+
+            return GenerateODataLink( resourceContext, isEntityId );
+        }
+
+        /// <remarks>This signature uses types that are AspNetCore-specific.</remarks>
+        public static void AddEntityId( HttpResponse response, Func<Uri> entityId ) {
+            if ( response.StatusCode == (int)HttpStatusCode.NoContent ) {
+                response.Headers.Add( EntityIdHeaderName, entityId().ToString() );
             }
         }
 
-        public static void AddServiceVersion(HttpResponse response, Func<string> version)
-        {
-            if (response.StatusCode == (int)HttpStatusCode.NoContent)
-            {
+        public static void AddServiceVersion( HttpResponse response, Func<string> version ) {
+            if ( response.StatusCode == (int)HttpStatusCode.NoContent ) {
                 response.Headers[ODataVersionConstraint.ODataServiceVersionHeader] = version();
             }
         }
 
-        internal static string GetVersionString(HttpRequest request)
-        {
-            return ODataUtils.ODataVersionToString(request.ODataServiceVersion() ?? ODataVersionConstraint.DefaultODataVersion);
+        internal static string GetVersionString( HttpRequest request ) {
+            return ODataUtils.ODataVersionToString( request.ODataServiceVersion() ?? ODataVersionConstraint.DefaultODataVersion );
         }
     }
 }
